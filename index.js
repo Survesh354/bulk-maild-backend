@@ -1,18 +1,20 @@
 const express = require("express");
 const cors = require("cors");
-const nodemailer = require("nodemailer");
 const mongoose = require("mongoose");
+const { Resend } = require("resend");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
+// 🔹 MongoDB connection (still needed if you use it elsewhere)
 mongoose.connect(process.env.MONGODB_URL)
   .then(() => console.log("Connected to MongoDB"))
   .catch((err) => console.error("Error connecting to MongoDB:", err));
 
-const credential = mongoose.model("credential", {}, "bulkmail");
+// 🔹 Initialize Resend
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 app.post("/sendmail", async (req, res) => {
   try {
@@ -25,29 +27,10 @@ app.post("/sendmail", async (req, res) => {
       });
     }
 
-    // 🔹 Fetch credentials from DB
-    const data = await credential.find();
-
-    if (!data.length) {
-      return res.status(500).json({
-        success: false,
-        message: "No email credentials found in database"
-      });
-    }
-
-    // 🔹 Create transporter dynamically
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: data[0].toJSON().user,
-        pass: data[0].toJSON().pass,
-      },
-    });
-
     // 🔹 Send mails one by one
     for (let i = 0; i < emaillist.length; i++) {
-      await transporter.sendMail({
-        from: data[0].toJSON().user,
+      await resend.emails.send({
+        from: "onboarding@resend.dev", // default test sender
         to: emaillist[i],
         subject: "Greetings",
         text: msg,
